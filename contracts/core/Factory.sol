@@ -6,6 +6,7 @@ import './interfaces/ITradingPairExchange.sol';
 import './TradingPairExchange.sol';
 
 contract Factory is IFactory {
+    address public feeTo;
     mapping(address => mapping(address => address)) public getPair;
     address[] public allTradingPairs;
 

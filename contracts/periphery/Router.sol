@@ -45,11 +45,11 @@ contract Router is IRouter {
         else{
            uint amountBOptimal = HexLibrary.quote(amountADesired, reserveA, reserveB); /* Given how many I want to deposit of the asset A, how many of asset B must I deposit? */
            if(amountBOptimal <= amountBDesired) {
-            require(amountBOptimal >= amountBMin, 'HexRouter: INSUFFICIENTE_B_AMOUNT');
+            require(amountBOptimal >= amountBMin, 'HexswapV2Router: INSUFFICIENTE_B_AMOUNT');
            } else { /* Same check that before but with asset A */
                 uint amountAOptimal = HexLibrary.quote(amountBDesired, reserveB, reserveA);
                 assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin, 'UniswapV2Router: INSUFFICIENT_A_AMOUNT');
+                require(amountAOptimal >= amountAMin, 'HexswapV2Router: INSUFFICIENT_A_AMOUNT');
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
            }
         }
@@ -88,6 +88,29 @@ contract Router is IRouter {
         (amountA, amountB) = token0 == tokenA ? (amount0, amount1) : (amount1, amount0);
         require(amountA >= amountAMin, "HexswapV2Router: INSUFFICIENT_A_AMOUNT");
         require(amountB >= amountBMin, "HexswapV2Router: INSUFFICIENT_B_AMOUNT");
+
+    }
+
+    // requires the initial amount to have already been sent to the first pair
+    function _swap(uint[] memory amounts, address[] memory path, address _to) internal virtual {
+        for (uint i; i < path.length -1; i++) { 
+            (address input, address output) = (path[i], path[i+1]); /* Get the addresses of the tokens to swap */
+            (address token0,) = HexLibrary.sortTokens(input, output); /* Are the input/output well ordered? */
+            uint amountOut = amounts[i+1]; /* Get the amountOut considering that the initial amount has already been sent */
+            (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0)); /* Assigns the right amount of output to one or the other depending on the order */
+            address to = i < path.length -2 ? HexLibrary.pairFor(factory, output, path[i + 2]) : _to; /* Is the recipient a pair or the final user */
+            ITradingPairExchange(HexLibrary.pairFor(factory, input, output)).swap(
+                amount0Out, amount1Out, to, new bytes(0)
+            );
+        }
+    }
+
+    function swapTokensForExactTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to) external virtual override returns(uint[] memory amounts) {
+        amounts = HexLibrary.getAmountsOut(factory, amountIn, path);
+        require(amounts[amounts.length -1 ] >= amountOutMin, 'HexswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
+        TransferHelper.safeTransferFrom(path[0], msg.sender, HexLibrary.pairFor(factory, path[0], path[1]), amounts[0]);
+        _swap(amounts, path, to);
+      
 
     }
      

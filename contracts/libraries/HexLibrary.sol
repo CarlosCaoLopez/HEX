@@ -26,7 +26,7 @@ library HexLibrary {
         )))));
     }
 
-    // fetch and sort the redderver for a pair
+    // fetch and sort the reserves for a pair
     function getReserves(address factory, address tokenA, address tokenB) internal view returns (uint reserveA, uint reserveB) {
         (address token0, ) = sortTokens(tokenA, tokenB); //Do not take both, we want reserves ordered, not addresses
         (uint reserve0, uint reserve1) =  ITradingPairExchange(pairFor(factory, tokenA, tokenB)).getReserves();
@@ -38,6 +38,29 @@ library HexLibrary {
         require(amountA > 0, 'UniswapV2Library: INSUFFICIENT_AMOUNT');
         require(reserveA > 0 && reserveB > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
         amountB = amountA * reserveB / reserveA; /* amount tokenA * price of tokenA respect tokenB = amount tokenB */
+    }
+
+    
+    // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut){
+        require(amountIn > 0, 'HexSwapV2Library: INSUFFICENT_INPUT_AMOUNT');
+        require(reserveIn > 0 && reserveOut > 0, 'HexSwaoV2Library: INSUFFICIENT_LIQUIDITY');
+        uint amountInWithFee = amountIn * 997; // 99.7% = 0.997 -> 0.997 * 1000 = 997 with no decimals!
+        uint numerator = amountInWithFee * reserveOut;
+        uint denominator = reserveIn * amountInWithFee;
+        amountOut = numerator / denominator;
+    }
+
+
+    // performs chained getAmountOut calculations on any number of pairs
+    function getAmountsOut(address factory, uint amountIn, address[] memory path) internal view returns (uint[] memory amounts) {
+        require(path.length >= 2, 'HexSwapV2Library: INVALID_PATH');
+        amounts = new uint[](path.length);
+        amounts[0] = amountIn;
+        for(uint i; i < path.length - 1; i++) {
+            (uint reserveIn, uint reserveOut) = getReserves(factory, path[i], path[i+1]);
+            amounts[i+1] = getAmountOut(amounts[i], reserveIn, reserveOut);
+        }
     }
 
 }
